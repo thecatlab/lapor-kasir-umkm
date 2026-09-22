@@ -16,6 +16,7 @@ reports/
 exports/
 backups/
 test-results/
+.pages/
 *.log
 
 # Development and OS files

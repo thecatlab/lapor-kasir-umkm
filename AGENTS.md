@@ -9,7 +9,7 @@ This repository is a small static cashier reporting app for UMKM use. `index.htm
 No package manager or build step is required. Use Node.js 20+ for development utilities.
 
 - `node scripts/serve.mjs`: serves browser assets at `http://127.0.0.1:8000` without exposing repository/private files.
-- `node --test tests/security.test.cjs`: checks security and compatibility with mocked Google services.
+- `node --test tests/*.test.cjs`: checks security, compatibility, and the Pages artifact with mocked Google services.
 - `git diff --check`: checks patch formatting.
 - `git status --short`: checks pending changes before and after edits.
 

@@ -67,6 +67,18 @@ window.LAPORKASIR_CONFIG = {
 
 Pada penyimpanan pertama, petugas memasukkan kode akses. Kode hanya diingat dalam memori halaman dan dibersihkan saat halaman dimuat ulang atau data di-reset. Kode tidak masuk ke draf, spreadsheet, atau ekspor. Kesalahan autentikasi meminta kode ulang pada percobaan berikutnya.
 
+### Deployment GitHub Pages
+
+Workflow `.github/workflows/pages.yml` membuat `config.js` saat deployment sehingga file lokal yang diabaikan Git tidak hilang dari situs.
+
+1. Di **Settings → Secrets and variables → Actions → Variables**, isi repository variable `LAPORKASIR_GOOGLE_SCRIPT_URL` dengan URL deployment Apps Script yang sama.
+2. Di **Settings → Pages → Build and deployment**, pilih **GitHub Actions**.
+3. Push ke `main` atau jalankan workflow **Deploy cashier site**. Workflow menguji aplikasi, memvalidasi URL, lalu memublikasikan hanya `index.html`, `config.js`, dan `assets/styles.css`.
+
+Jangan isi access token di repository variable tersebut. URL deployment memang akan terlihat di browser; token tetap hanya di Script Properties dan memori sesi kasir.
+
+Pada tab **Laporan**, tombol **Periksa koneksi penyimpanan** memverifikasi akses ke spreadsheet dan folder yang sudah dikonfigurasi tanpa membuat laporan atau file. Ini bukan uji penulisan; uji penyimpanan penuh harus menggunakan lingkungan pengujian terpisah.
+
 ### Migrasi dari versi sebelumnya
 
 Perbarui frontend dan backend bersama:
@@ -78,6 +90,8 @@ Perbarui frontend dan backend bersama:
 5. Uji dengan laporan sintetis di spreadsheet/folder pengujian sebelum digunakan secara operasional.
 
 Draf lama tetap dibaca melalui kunci `localStorage` sebelumnya. Tidak ada migrasi atau penghapusan data kas lokal.
+
+Permintaan dari browser tidak boleh membuat spreadsheet pengganti. Jika ID tujuan hilang, penyimpanan gagal dengan aman; pembuatan spreadsheet baru hanya tersedia melalui fungsi setup yang dijalankan pengelola di editor.
 
 ## Penggunaan dan perhitungan
 
@@ -121,7 +135,7 @@ AGENTS.md                Pedoman kontribusi
 ```
 
 ```sh
-node --test tests/security.test.cjs
+node --test tests/*.test.cjs
 git diff --check
 ```
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="application-version" content="2026.09.22.1">
+    <meta name="application-version" content="2026.09.22.2">
     <meta name="referrer" content="no-referrer">
     <title>LaporKasir</title>
     
@@ -398,6 +398,12 @@
             saveButton.id = 'report-save-btn';
             saveButton.onclick = () => window.handleReportAndSave('download');
             saveButton.querySelector('span').textContent = 'Simpan';
+            const connectionButton = document.createElement('button');
+            connectionButton.type = 'button';
+            connectionButton.className = 'w-full text-xs text-gray-500 py-2';
+            connectionButton.textContent = 'Periksa koneksi penyimpanan';
+            connectionButton.addEventListener('click', () => checkStorageConnection(connectionButton));
+            mainContent.querySelector('[data-html2canvas-ignore]').appendChild(connectionButton);
             footerContainer.style.display = 'none';
             setReportSubmitting(isSubmittingReport);
         }
@@ -620,6 +626,28 @@
                 .finally(() => {
                     if (document.body.contains(clone)) document.body.removeChild(clone);
                 });
+        }
+
+        async function checkStorageConnection(button) {
+            if (isSubmittingReport) return;
+            button.disabled = true;
+            button.textContent = 'Memeriksa koneksi...';
+            try {
+                const response = await submitReportToAppsScript({ requestId: createRequestId(), action: 'checkConnection' });
+                if (!response || response.ok !== true || response.status !== 'ready') {
+                    throw new Error(response && response.message || 'Koneksi penyimpanan belum siap.');
+                }
+                openActionModal('Koneksi Siap', 'Google Sheets dan folder Drive dapat diakses. Tidak ada laporan yang dibuat.', [
+                    { label: 'Tutup', variant: 'primary' }
+                ]);
+            } catch (error) {
+                openActionModal('Koneksi Belum Siap', error.message || 'Periksa konfigurasi penyimpanan.', [
+                    { label: 'Tutup', variant: 'secondary' }
+                ]);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Periksa koneksi penyimpanan';
+            }
         }
 
         function getSubmissionToken() {

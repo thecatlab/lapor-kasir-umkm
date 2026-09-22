@@ -206,6 +206,36 @@ test('existing spreadsheet errors do not cause silent replacement', () => {
     assert.equal(properties.get('LAPORKASIR_SPREADSHEET_ID'), 'existing-sheet');
 });
 
+test('report requests never create a replacement spreadsheet when the destination is missing', () => {
+    const { context } = backend();
+    let created = false;
+    context.SpreadsheetApp = { create() { created = true; } };
+    assert.throws(() => context.getOrCreateSpreadsheet_(), /existing spreadsheet/);
+    assert.equal(created, false);
+});
+
+test('connection check authenticates and reads the existing destinations without writes', () => {
+    const { context, properties, effects } = backend();
+    properties.set('LAPORKASIR_SPREADSHEET_ID', 'original-sheet');
+    context.SpreadsheetApp = {
+        openById: id => ({ getId: () => id, getSheetByName: () => ({}) })
+    };
+    context.DriveApp = {
+        getFolderById: id => ({ getId: () => id, isTrashed: () => false })
+    };
+    const data = { requestId: 'check-only', authToken: token, clientOrigin: origin, action: 'checkConnection' };
+    const response = context.checkConnection_(data);
+    assert.equal(response.status, 'ready');
+    assert.equal(response.spreadsheetId, 'original-sheet');
+    assert.equal(response.folderId, 'synthetic-server-folder');
+    assert.deepEqual(effects, []);
+    assert.throws(() => context.checkConnection_({ ...data, authToken: '' }), /Kode akses/);
+    assert.deepEqual(effects, []);
+    const framed = context.doPost({ parameter: { payload: JSON.stringify(data) } }).content;
+    assert.ok(framed.includes('"status":"ready"'));
+    assert.ok(!framed.includes(token));
+});
+
 test('duplicate detection and revisions retain their existing behavior', () => {
     const { context } = backend();
     const rows = [

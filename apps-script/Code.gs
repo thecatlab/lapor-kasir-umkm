@@ -60,7 +60,7 @@ function doGet() {
 // Trailing underscore prevents access through google.script.run from HTML responses.
 function authorizeLaporKasir_() {
   var folder = DriveApp.getFolderById(getDriveFolderId_());
-  var spreadsheet = getOrCreateSpreadsheet_();
+  var spreadsheet = getOrCreateSpreadsheet_(true);
 
   return {
     folderName: folder.getName(),
@@ -80,7 +80,7 @@ function doPost(e) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw requestError_('Format laporan tidak valid.');
     requestId = typeof payload.requestId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(payload.requestId) ? payload.requestId : '';
     targetOrigin = getAllowedOrigin_(payload.clientOrigin);
-    response = saveReport_(payload);
+    response = payload.action === 'checkConnection' ? checkConnection_(payload) : saveReport_(payload);
   } catch (err) {
     response = {
       ok: false,
@@ -104,6 +104,23 @@ function saveReport_(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function checkConnection_(payload) {
+  authorizeSubmission_(payload);
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(payload.requestId || '')) throw requestError_('ID permintaan tidak valid.');
+  var spreadsheet = getOrCreateSpreadsheet_();
+  var folder = DriveApp.getFolderById(getDriveFolderId_());
+  if (folder.isTrashed() || !spreadsheet.getSheetByName(REPORT_SHEET_NAME) || !spreadsheet.getSheetByName(EXPENSE_SHEET_NAME)) {
+    throw new Error('The existing report destinations are not ready.');
+  }
+  return {
+    ok: true,
+    status: 'ready',
+    version: '2026.09.22.2',
+    spreadsheetId: spreadsheet.getId(),
+    folderId: folder.getId()
+  };
 }
 
 function requestError_(message, code) {
@@ -292,7 +309,7 @@ function getExistingScreenshot_(sheet, rowNumber) {
   };
 }
 
-function getOrCreateSpreadsheet_() {
+function getOrCreateSpreadsheet_(allowCreate) {
   var properties = PropertiesService.getScriptProperties();
   var storedId = properties.getProperty(SPREADSHEET_ID_PROPERTY);
 
@@ -301,6 +318,7 @@ function getOrCreateSpreadsheet_() {
     return SpreadsheetApp.openById(storedId);
   }
 
+  if (allowCreate !== true) throw new Error('Configure the existing spreadsheet before accepting reports.');
   var spreadsheet = SpreadsheetApp.create(SPREADSHEET_NAME);
   spreadsheet.getSheets()[0].setName(REPORT_SHEET_NAME);
   properties.setProperty(SPREADSHEET_ID_PROPERTY, spreadsheet.getId());
