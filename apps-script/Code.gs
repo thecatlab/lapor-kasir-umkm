@@ -1,8 +1,12 @@
-var SPREADSHEET_NAME = 'LaporKasir SKMK Data';
+var SPREADSHEET_NAME = 'LaporKasir Data';
 var REPORT_SHEET_NAME = 'Laporan';
 var EXPENSE_SHEET_NAME = 'Pengeluaran';
 var SPREADSHEET_ID_PROPERTY = 'LAPORKASIR_SPREADSHEET_ID';
-var DEFAULT_DRIVE_FOLDER_ID = '1wBzVkBvLXEPn5pO87oYmJXo7wiG5H2LR';
+var DRIVE_FOLDER_ID_PROPERTY = 'LAPORKASIR_DRIVE_FOLDER_ID';
+var ACCESS_TOKEN_PROPERTY = 'LAPORKASIR_ACCESS_TOKEN';
+var ALLOWED_ORIGINS_PROPERTY = 'LAPORKASIR_ALLOWED_ORIGINS';
+var MAX_PAYLOAD_LENGTH = 12 * 1024 * 1024;
+var MAX_IMAGE_LENGTH = 8 * 1024 * 1024;
 var DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500];
 
 var REPORT_HEADERS = [
@@ -50,12 +54,12 @@ var EXPENSE_HEADERS = [
 
 function doGet() {
   return HtmlService
-    .createHtmlOutput('LaporKasir Apps Script endpoint is active.')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .createHtmlOutput('LaporKasir Apps Script endpoint is active.');
 }
 
-function authorizeLaporKasir() {
-  var folder = DriveApp.getFolderById(DEFAULT_DRIVE_FOLDER_ID);
+// Trailing underscore prevents access through google.script.run from HTML responses.
+function authorizeLaporKasir_() {
+  var folder = DriveApp.getFolderById(getDriveFolderId_());
   var spreadsheet = getOrCreateSpreadsheet_();
 
   return {
@@ -65,27 +69,33 @@ function authorizeLaporKasir() {
 }
 
 function doPost(e) {
-  var payloadText = getPayloadText_(e);
-  var requestId = extractRequestId_(payloadText);
+  var requestId = '';
+  var targetOrigin = '';
   var response;
 
   try {
+    var payloadText = getPayloadText_(e);
+    if (payloadText.length > MAX_PAYLOAD_LENGTH) throw requestError_('Laporan terlalu besar.');
     var payload = JSON.parse(payloadText);
-    requestId = payload.requestId || requestId;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw requestError_('Format laporan tidak valid.');
+    requestId = typeof payload.requestId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(payload.requestId) ? payload.requestId : '';
+    targetOrigin = getAllowedOrigin_(payload.clientOrigin);
     response = saveReport_(payload);
   } catch (err) {
     response = {
       ok: false,
       status: 'error',
-      message: err && err.message ? err.message : String(err)
+      code: err && err.publicCode ? err.publicCode : 'SAVE_FAILED',
+      message: err && err.publicCode ? err.message : 'Laporan gagal disimpan. Periksa konfigurasi atau hubungi pengelola.'
     };
   }
 
-  return renderResponse_(requestId, response);
+  return renderResponse_(requestId, response, targetOrigin);
 }
 
 function saveReport_(payload) {
-  if (!payload || !payload.reportDate) throw new Error('Tanggal laporan tidak ditemukan.');
+  authorizeSubmission_(payload);
+  validatePayload_(payload);
 
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -94,6 +104,113 @@ function saveReport_(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function requestError_(message, code) {
+  var error = new Error(message);
+  error.publicCode = code || 'INVALID_REQUEST';
+  return error;
+}
+
+function getDriveFolderId_() {
+  var id = PropertiesService.getScriptProperties().getProperty(DRIVE_FOLDER_ID_PROPERTY);
+  if (!id) throw new Error('Drive folder is not configured.');
+  return id;
+}
+
+function getAllowedOrigin_(origin) {
+  var configured = PropertiesService.getScriptProperties().getProperty(ALLOWED_ORIGINS_PROPERTY) || '';
+  var origins = configured.split(',').map(function(value) { return value.trim(); }).filter(Boolean);
+  var isWebOrigin = typeof origin === 'string' &&
+    /^(https:\/\/[a-z0-9.-]+(:[0-9]+)?|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)$/i.test(origin);
+  if (!isWebOrigin || origins.indexOf(origin) === -1) throw requestError_('Alamat aplikasi belum diizinkan.');
+  return origin;
+}
+
+function authorizeSubmission_(payload) {
+  var expected = PropertiesService.getScriptProperties().getProperty(ACCESS_TOKEN_PROPERTY);
+  if (!expected || expected.length < 32 || expected.length > 256) throw new Error('Access token is not configured.');
+  if (!payload || typeof payload.authToken !== 'string' || payload.authToken.length > 256) {
+    throw requestError_('Kode akses tidak valid. Hubungi pengelola.', 'UNAUTHORIZED');
+  }
+  // Compare fixed-length digests; the token is never persisted with the report.
+  var actualHash = sha256_(payload.authToken);
+  var expectedHash = sha256_(expected);
+  var difference = 0;
+  for (var i = 0; i < expectedHash.length; i++) {
+    difference |= actualHash.charCodeAt(i) ^ expectedHash.charCodeAt(i);
+  }
+  if (difference !== 0) throw requestError_('Kode akses tidak valid. Hubungi pengelola.', 'UNAUTHORIZED');
+  // Origin restrictions are defense in depth, not a substitute for the token.
+  getAllowedOrigin_(payload.clientOrigin);
+}
+
+function validatePayload_(payload) {
+  function text(value, maximum, required) {
+    if (!required && (value === undefined || value === null)) return;
+    if (typeof value !== 'string' || value.length > maximum || (required && !value)) {
+      throw requestError_('Teks laporan tidak valid atau terlalu panjang.');
+    }
+  }
+  function object(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw requestError_('Format laporan tidak valid.');
+  }
+  function numeric(value, optional, nonnegative, integer) {
+    if (optional && (value === undefined || value === null || value === '')) return;
+    if (typeof value !== 'number' || !isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER ||
+        (nonnegative && value < 0) || (integer && Math.floor(value) !== value)) {
+      throw requestError_('Nilai angka laporan tidak valid.');
+    }
+  }
+
+  text(payload.requestId, 128, true);
+  if (!/^[A-Za-z0-9_-]+$/.test(payload.requestId)) throw requestError_('ID permintaan tidak valid.');
+  text(payload.reportDate, 10, true);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.reportDate)) throw requestError_('Tanggal laporan tidak valid.');
+  var date = new Date(payload.reportDate + 'T00:00:00Z');
+  if (!isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== payload.reportDate) throw requestError_('Tanggal laporan tidak valid.');
+  text(payload.submittedClientAt, 40, false);
+  text(payload.notes, 20000, false);
+  text(payload.reportText, 45000, false);
+  text(payload.discrepancyStatus, 80, false);
+  object(payload.calculations);
+  ['startTotal', 'endTotal', 'expensesTotal', 'netCashFlow', 'cashIncome', 'qris', 'lainLain',
+    'setorTunai', 'totalIncome', 'qasir', 'discrepancy'].forEach(function(key) {
+    numeric(payload.calculations[key], false, false, false);
+  });
+  object(payload.denominations);
+  ['start', 'end'].forEach(function(side) {
+    object(payload.denominations[side]);
+    DENOMINATIONS.forEach(function(value) { numeric(payload.denominations[side][value], true, true, true); });
+  });
+  if (!Array.isArray(payload.expenses) || payload.expenses.length > 500) throw requestError_('Maksimal 500 pengeluaran per laporan.');
+  payload.expenses.forEach(function(expense) {
+    object(expense);
+    text(expense.name, 1000, true);
+    text(expense.unit, 100, false);
+    numeric(expense.index, true, true, true);
+    numeric(expense.qty, true, false, false);
+    numeric(expense.amount, false, true, false);
+  });
+  if (payload.image !== undefined && payload.image !== null) {
+    object(payload.image);
+    text(payload.image.base64, MAX_IMAGE_LENGTH, false);
+    text(payload.image.filename, 200, false);
+    if (payload.image.filename && !/^[A-Za-z0-9_. ()-]+\.png$/i.test(payload.image.filename)) throw requestError_('Nama gambar tidak valid.');
+    if (payload.image.base64) {
+      if (payload.image.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload.image.base64)) throw requestError_('Data gambar tidak valid.');
+      var bytes = Utilities.base64Decode(payload.image.base64);
+      var signature = [137, 80, 78, 71, 13, 10, 26, 10];
+      if (bytes.length < signature.length || !signature.every(function(value, index) { return (bytes[index] & 255) === value; })) {
+        throw requestError_('Gambar harus berformat PNG.');
+      }
+    }
+  }
+}
+
+function safeCellValue_(value) {
+  // An apostrophe makes formula-like strings literal in Sheets; keep numbers numeric.
+  return typeof value === 'string' && /^[\s\u0000-\u001f]*[=+@'\-]/.test(value) ? "'" + value : value;
 }
 
 function saveReportLocked_(payload) {
@@ -180,18 +297,8 @@ function getOrCreateSpreadsheet_() {
   var storedId = properties.getProperty(SPREADSHEET_ID_PROPERTY);
 
   if (storedId) {
-    try {
-      return SpreadsheetApp.openById(storedId);
-    } catch (err) {
-      properties.deleteProperty(SPREADSHEET_ID_PROPERTY);
-    }
-  }
-
-  var files = DriveApp.getFilesByName(SPREADSHEET_NAME);
-  if (files.hasNext()) {
-    var existing = SpreadsheetApp.openById(files.next().getId());
-    properties.setProperty(SPREADSHEET_ID_PROPERTY, existing.getId());
-    return existing;
+    // A permissions/configuration error must not silently redirect reports to a new file.
+    return SpreadsheetApp.openById(storedId);
   }
 
   var spreadsheet = SpreadsheetApp.create(SPREADSHEET_NAME);
@@ -211,9 +318,8 @@ function ensureSheet_(spreadsheet, name, headers) {
 function saveScreenshot_(image) {
   if (!image || !image.base64) return { id: '', url: '', filename: '' };
 
-  var folderId = image.folderId || DEFAULT_DRIVE_FOLDER_ID;
-  var folder = DriveApp.getFolderById(folderId);
-  var filename = image.filename || 'Laporan_Harian_SKMK.png';
+  var folder = DriveApp.getFolderById(getDriveFolderId_());
+  var filename = image.filename || 'Laporan_Harian.png';
   var bytes = Utilities.base64Decode(image.base64);
   var blob = Utilities.newBlob(bytes, 'image/png', filename);
   var file = folder.createFile(blob);
@@ -261,7 +367,7 @@ function buildReportRow_(payload, context) {
     row.push(denominationValue_(payload, 'end', value));
   });
 
-  return row;
+  return row.map(safeCellValue_);
 }
 
 function buildExpenseRows_(payload, submittedAtServer, submissionId, revision) {
@@ -277,7 +383,7 @@ function buildExpenseRows_(payload, submittedAtServer, submissionId, revision) {
       expense.qty === undefined || expense.qty === null ? '' : expense.qty,
       expense.unit || '',
       numberValue_(expense.amount)
-    ];
+    ].map(safeCellValue_);
   });
 }
 
@@ -369,20 +475,18 @@ function getPayloadText_(e) {
   throw new Error('Payload kosong.');
 }
 
-function extractRequestId_(payloadText) {
-  if (!payloadText) return '';
-  var match = String(payloadText).match(/"requestId"\s*:\s*"([^"]+)"/);
-  return match ? match[1] : '';
-}
-
-function renderResponse_(requestId, response) {
+function renderResponse_(requestId, response, targetOrigin) {
   var envelope = {
     source: 'laporkasir-apps-script',
     requestId: requestId || '',
     response: response
   };
+  if (!targetOrigin) {
+    return ContentService.createTextOutput(JSON.stringify(envelope)).setMimeType(ContentService.MimeType.JSON);
+  }
   var json = JSON.stringify(envelope).replace(/</g, '\\u003c');
-  var html = '<!doctype html><html><body><script>window.top.postMessage(' + json + ', "*");</script></body></html>';
+  var originJson = JSON.stringify(targetOrigin).replace(/</g, '\\u003c');
+  var html = '<!doctype html><html><body><script>window.top.postMessage(' + json + ', ' + originJson + ');</script></body></html>';
 
   return HtmlService
     .createHtmlOutput(html)

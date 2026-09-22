@@ -2,17 +2,18 @@
 
 ## Project Structure & Module Organization
 
-This repository is a small static cashier reporting app for UMKM use. The main application lives in `index.html`, which contains the markup, Tailwind CDN styling, and browser JavaScript. `README.md` provides the project summary. There is no separate `src/`, `tests/`, or asset directory yet. If the app grows, prefer focused folders such as `assets/` for images/icons and `tests/` for browser checks.
+This repository is a small static cashier reporting app for UMKM use. `index.html` contains markup and browser JavaScript; `assets/styles.css` contains compiled Tailwind styling. `apps-script/Code.gs` is the Sheets/Drive backend. `config.example.js` documents browser configuration; actual `config.js` is ignored. `README.md` covers setup and usage, and `SECURITY.md` records the review. Keep tests in `tests/` and development utilities in `scripts/`.
 
 ## Build, Test, and Development Commands
 
-No package manager or build step is currently configured.
+No package manager or build step is required. Use Node.js 20+ for development utilities.
 
-- `open index.html`: opens the app directly in a browser on macOS.
-- `python3 -m http.server 8000`: serves the repository locally at `http://localhost:8000` when browser security or network behavior needs an HTTP origin.
+- `node scripts/serve.mjs`: serves browser assets at `http://127.0.0.1:8000` without exposing repository/private files.
+- `node --test tests/security.test.cjs`: checks security and compatibility with mocked Google services.
+- `git diff --check`: checks patch formatting.
 - `git status --short`: checks pending changes before and after edits.
 
-Dependencies load from CDNs, so test with an internet connection unless they are replaced with local assets.
+html2canvas and fonts load from CDNs, so test with an internet connection. Tailwind is compiled into `assets/styles.css`; regenerate it with the pinned command in README after changing utility classes.
 
 ## Coding Style & Naming Conventions
 
@@ -20,7 +21,7 @@ Match the existing single-file style. Use 4-space indentation for HTML, CSS, and
 
 ## Testing Guidelines
 
-There is no automated test framework yet. Verify changes manually in a browser by checking the main tabs: `Awal`, `Akhir`, `Pengeluaran`, and `Laporan`. For state changes, confirm `localStorage` persistence by refreshing. For reporting or screenshot changes, test the generated output on mobile-sized and desktop viewports. If automated tests are added later, place them under `tests/` and document the runner here.
+Use the built-in Node test runner for security and compatibility checks. Verify the tabs `Awal`, `Akhir`, `Pengeluaran`, and `Laporan` in a browser. Confirm draft persistence on refresh and screenshot output on mobile/desktop viewports. Use synthetic data with mocks or a dedicated test deployment; never submit test data to production.
 
 ## Commit & Pull Request Guidelines
 
@@ -28,4 +29,4 @@ Recent commits use concise messages such as `Update index.html` and `Update READ
 
 ## Security & Configuration Tips
 
-`index.html` currently contains Google Drive and Google Script identifiers. Treat service URLs and IDs as configuration-sensitive: do not replace them casually, and document any production changes in the PR description. Avoid committing private credentials or user sales data.
+Keep production URLs in ignored deployment configuration and Drive/spreadsheet identifiers in Apps Script properties. Browser configuration is public even when ignored by Git. Tokens belong only in runtime input and server properties; never commit them or persist them in browser storage. Preserve the draft storage key and calculations. Escape untrusted HTML/spreadsheet text, validate submissions, and document deployment migrations. Do not commit credentials or sales data.

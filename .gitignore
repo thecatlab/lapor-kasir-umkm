@@ -1,0 +1,26 @@
+# Deployment-specific configuration and secrets
+config.js
+.env
+.env.*
+!.env.example
+.clasp.json
+.clasprc.json
+credentials*.json
+service-account*.json
+*.pem
+*.key
+
+# Private reports, backups, and local review artifacts
+private/
+reports/
+exports/
+backups/
+test-results/
+*.log
+
+# Development and OS files
+node_modules/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

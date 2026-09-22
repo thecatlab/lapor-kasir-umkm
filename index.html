@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="application-version" content="2026.08.11.3">
-    <title>Laporan Kasir SKMK</title>
+    <meta name="application-version" content="2026.09.22.1">
+    <meta name="referrer" content="no-referrer">
+    <title>LaporKasir</title>
     
     <!-- Favicon (Wallet Icon) -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>'>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+    <script src="config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
@@ -34,7 +36,7 @@
                     <div class="p-2 bg-emerald-100 rounded-lg">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
                     </div>
-                    <h1 class="text-lg font-bold tracking-tight text-slate-900">Laporan Kasir SKMK</h1>
+                    <h1 class="text-lg font-bold tracking-tight text-slate-900">LaporKasir</h1>
                 </div>
                 <button onclick="window.confirmReset()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Reset All">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
@@ -74,6 +76,19 @@
         <div id="toast" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50 text-sm font-medium text-center min-w-[200px]">Disalin ke clipboard!</div>
     </div>
 
+    <dialog id="access-dialog" aria-labelledby="access-title" class="rounded-2xl p-6 w-full max-w-sm shadow-xl backdrop:bg-black/50">
+        <form method="dialog" class="space-y-4">
+            <h2 id="access-title" class="font-bold text-lg">Akses Penyimpanan Laporan</h2>
+            <p class="text-sm text-gray-600">Masukkan kode akses dari pengelola. Kode hanya diingat selama halaman ini terbuka.</p>
+            <label for="access-code" class="block text-sm font-medium">Kode akses</label>
+            <input id="access-code" type="password" required maxlength="256" autocomplete="off" class="w-full p-3 border border-gray-300 rounded-lg">
+            <div class="flex gap-3">
+                <button type="button" onclick="this.closest('dialog').close('cancel')" class="flex-1 py-3 bg-gray-100 rounded-xl">Batal</button>
+                <button value="submit" class="flex-1 py-3 bg-emerald-600 text-white rounded-xl">Lanjutkan</button>
+            </div>
+        </form>
+    </dialog>
+
     <script>
         // --- 1. CONFIGURATION & STATE ---
         const denominations = [
@@ -87,11 +102,10 @@
             { value: 500, color: 'text-stone-500', bg: 'bg-stone-50', border: 'border-stone-200' },
         ];
 
-        const GOOGLE_DRIVE_FOLDER_ID = '1wBzVkBvLXEPn5pO87oYmJXo7wiG5H2LR';
-        // Apps Script deployment ID: AKfycbzpJSSHhCbPoWzRfqD98y_HxEyYCGuSRm8DxnQoFiPdd7D6MEZecdfi1Bx2oP_AApAu
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpJSSHhCbPoWzRfqD98y_HxEyYCGuSRm8DxnQoFiPdd7D6MEZecdfi1Bx2oP_AApAu/exec';
+        // Public deployment configuration only; access codes must never be placed here.
+        const GOOGLE_SCRIPT_URL = (window.LAPORKASIR_CONFIG || {}).googleScriptUrl || '';
+        let submissionToken = '';
 
-        // UPDATED: Added lainLain and setorTunai to initial state
         let currentMode = 'start';
         let shiftData = { start: {}, end: {}, expenses: [], qris: '', lainLain: '', setorTunai: '', qasir: '', notes: '', reportDate: new Date().toISOString().split('T')[0] };
         let isSubmittingReport = false;
@@ -106,7 +120,6 @@
                 if (parsed.end) shiftData.end = { ...shiftData.end, ...parsed.end };
                 if (Array.isArray(parsed.expenses)) shiftData.expenses = parsed.expenses;
                 shiftData.qris = parsed.qris !== undefined ? parsed.qris : '';
-                // UPDATED: Load new fields
                 shiftData.lainLain = parsed.lainLain !== undefined ? parsed.lainLain : '';
                 shiftData.setorTunai = parsed.setorTunai !== undefined ? parsed.setorTunai : '';
                 
@@ -126,7 +139,13 @@
         const numberFormatter = new Intl.NumberFormat('id-ID');
 
         // --- 2. HELPERS & FORMATTERS ---
+        // Keep the legacy storage key so existing cashier drafts survive upgrades.
         function saveData() { localStorage.setItem('skmk_kas_data_v2', JSON.stringify(shiftData)); }
+
+        function escapeHtml(value) {
+            const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+            return String(value ?? '').replace(/[&<>"']/g, character => entities[character]);
+        }
 
         function calculateTotal(mode) {
             if (mode === 'expenses') return shiftData.expenses.reduce((acc, curr) => acc + curr.amount, 0);
@@ -137,13 +156,11 @@
             }, 0);
         }
 
-        // UPDATED: Revised calculation logic to include Setor Tunai and Lain-Lain correctly
         function getReportCalculations() {
             const startTotal = calculateTotal('start');
             const endTotal = calculateTotal('end');
             const expensesTotal = calculateTotal('expenses');
             
-            // New Fields
             const qris = typeof shiftData.qris === 'number' ? shiftData.qris : 0;
             const lainLain = typeof shiftData.lainLain === 'number' ? shiftData.lainLain : 0;
             const setorTunai = typeof shiftData.setorTunai === 'number' ? shiftData.setorTunai : 0;
@@ -155,13 +172,11 @@
             const cashIncome = netCashFlow + expensesTotal + setorTunai;
             
             // Total Income (Real Money Received) = Cash Income + QRIS
-            // UPDATED: Removed 'lainLain' from here to avoid double counting.
             const totalIncome = cashIncome + qris;
             
             const qasir = typeof shiftData.qasir === 'number' ? shiftData.qasir : 0;
             
             // Discrepancy = Real Income - Target (Qasir) - Known Extra Income (Lain-Lain)
-            // UPDATED: Subtracting lainLain to balance the equation against Qasir.
             const discrepancy = totalIncome - qasir - lainLain;
             
             return { startTotal, endTotal, expensesTotal, netCashFlow, cashIncome, qris, lainLain, setorTunai, totalIncome, qasir, discrepancy };
@@ -293,8 +308,9 @@
             openModal('Reset Semua Data?', 'Data Awal, Akhir, Pengeluaran, dan Laporan akan dihapus total.', () => {
                 denominations.forEach(d => { shiftData.start[d.value] = ''; shiftData.end[d.value] = ''; });
                 shiftData.expenses = []; 
-                shiftData.qris = ''; shiftData.lainLain = ''; shiftData.setorTunai = ''; // UPDATED: Reset new fields
+                shiftData.qris = ''; shiftData.lainLain = ''; shiftData.setorTunai = '';
                 shiftData.qasir = ''; shiftData.notes = ''; shiftData.reportDate = new Date().toISOString().split('T')[0];
+                submissionToken = '';
                 saveData(); renderContent(); updateFooter(); showToast('Data berhasil di-reset');
             });
         }
@@ -353,7 +369,7 @@
                             ${formatLabel(d.value)}
                         </div>
                         <div class="bg-white text-slate-800 font-bold text-xl py-2 h-auto min-h-[32px] flex items-center justify-center">
-                            ${count}
+                            ${escapeHtml(count)}
                         </div>
                     </div>
                 `;
@@ -365,8 +381,8 @@
         function renderReport() {
             const vals = getReportCalculations();
             const formattedQris = shiftData.qris === '' ? '' : numberFormatter.format(shiftData.qris);
-            const formattedLainLain = shiftData.lainLain === '' ? '' : numberFormatter.format(shiftData.lainLain); // NEW
-            const formattedSetorTunai = shiftData.setorTunai === '' ? '' : numberFormatter.format(shiftData.setorTunai); // NEW
+            const formattedLainLain = shiftData.lainLain === '' ? '' : numberFormatter.format(shiftData.lainLain);
+            const formattedSetorTunai = shiftData.setorTunai === '' ? '' : numberFormatter.format(shiftData.setorTunai);
             const formattedQasir = shiftData.qasir === '' ? '' : numberFormatter.format(shiftData.qasir);
             const formattedDate = getFormattedDate(shiftData.reportDate);
             let discLabel = '', discColor = '';
@@ -377,7 +393,7 @@
             const gridAwal = renderDenomGrid(shiftData.start, 'Rincian Fisik Awal');
             const gridAkhir = renderDenomGrid(shiftData.end, 'Rincian Fisik Akhir');
 
-            mainContent.innerHTML = `<div id="report-card" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-5"><h2 class="text-center font-bold text-gray-900 text-lg">Laporan & Rekonsiliasi</h2><div class="mb-2 text-center"><label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tanggal Laporan</label><div class="mt-1 relative flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"><div class="text-slate-800 font-bold text-lg border-b border-gray-200 pb-1 px-4 min-w-[200px]">${formattedDate}</div><input type="date" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" value="${shiftData.reportDate}" onchange="window.updateReportDate(this.value)" onclick="try{this.showPicker()}catch(e){}"></div><div class="text-[10px] text-gray-300 mt-1">Ketuk tanggal untuk mengganti</div></div><div class="space-y-2 text-sm border-b border-gray-100 pb-4"><div class="flex justify-between text-gray-600"><span>Kas Awal</span><span class="font-medium">${formatter.format(vals.startTotal)}</span></div><div class="flex justify-between text-gray-600"><span>Kas Akhir</span><span class="font-medium">${formatter.format(vals.endTotal)}</span></div><div class="flex justify-between text-gray-600"><span>Selisih Kas</span><span class="font-medium ${vals.netCashFlow >=0 ? 'text-green-600' : 'text-red-600'}">${formatter.format(vals.netCashFlow)}</span></div><div class="flex justify-between text-gray-600"><span>Total Pengeluaran</span><span class="font-medium text-red-600">-${formatter.format(vals.expensesTotal)}</span></div><div class="flex justify-between font-semibold pt-2 border-t border-gray-50 mt-2 text-slate-800"><span>Pendapatan Cash</span><span id="rep-pendapatan-cash">${formatter.format(vals.cashIncome)}</span></div></div><div class="space-y-4"><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Pendapatan QRIS/Transfer</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedQris}" oninput="window.updateFormattedInput('qris', this)"></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Pendapatan Lain-Lain</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedLainLain}" oninput="window.updateFormattedInput('lainLain', this)"></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Setor Tunai (Diambil dari Kas)</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedSetorTunai}" oninput="window.updateFormattedInput('setorTunai', this)"></div></div><div class="flex justify-between font-semibold text-sm pt-2 border-t border-gray-50 mt-2 text-slate-800"><span>Total Pendapatan</span><span id="rep-total-pendapatan" class="text-emerald-700">${formatter.format(vals.totalIncome)}</span></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Total Pendapatan Qasir (App)</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" value="${formattedQasir}" oninput="window.updateFormattedInput('qasir', this)"></div></div></div><div class="bg-slate-50 p-4 rounded-xl border border-gray-200"><div class="text-center"><div class="text-xs text-gray-500 font-semibold uppercase mb-1">Total Selisih</div><div id="rep-selisih-pendapatan" class="font-bold text-2xl ${discColor}">${formatter.format(vals.discrepancy)}</div><div id="rep-selisih-label" class="text-xs font-medium mt-1 ${discColor}">${discLabel}</div></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Keterangan Selisih</label><textarea rows="3" placeholder="Jelaskan penyebab selisih..." class="w-full p-3 bg-white border border-gray-200 rounded-lg text-sm text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none" oninput="window.updateNotesInput(this.value)">${shiftData.notes}</textarea></div><div class="border-t border-gray-50 pt-4 space-y-4">${gridAwal}${gridAkhir}</div><div class="pt-2 space-y-3" data-html2canvas-ignore="true"><button id="report-submit-btn" onclick="window.handleReportAndSave()" class="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold transition-colors"><span id="report-submit-spinner" class="hidden w-5 h-5 border-2 border-white/60 border-t-white rounded-full animate-spin"></span><svg id="report-submit-icon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg><span id="report-submit-label">Laporkan</span></button><div class="grid grid-cols-2 gap-3"><button onclick="window.captureScreenshot()" class="flex items-center justify-center space-x-2 bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 py-3 rounded-xl font-semibold transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Simpan</span></button><button onclick="window.copyReport()" class="flex items-center justify-center space-x-2 bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 py-3 rounded-xl font-semibold transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg><span>Salin</span></button></div></div></div>`;
+            mainContent.innerHTML = `<div id="report-card" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-5"><h2 class="text-center font-bold text-gray-900 text-lg">Laporan & Rekonsiliasi</h2><div class="mb-2 text-center"><label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tanggal Laporan</label><div class="mt-1 relative flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"><div class="text-slate-800 font-bold text-lg border-b border-gray-200 pb-1 px-4 min-w-[200px]">${formattedDate}</div><input type="date" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" value="${escapeHtml(shiftData.reportDate)}" onchange="window.updateReportDate(this.value)" onclick="try{this.showPicker()}catch(e){}"></div><div class="text-[10px] text-gray-300 mt-1">Ketuk tanggal untuk mengganti</div></div><div class="space-y-2 text-sm border-b border-gray-100 pb-4"><div class="flex justify-between text-gray-600"><span>Kas Awal</span><span class="font-medium">${formatter.format(vals.startTotal)}</span></div><div class="flex justify-between text-gray-600"><span>Kas Akhir</span><span class="font-medium">${formatter.format(vals.endTotal)}</span></div><div class="flex justify-between text-gray-600"><span>Selisih Kas</span><span class="font-medium ${vals.netCashFlow >=0 ? 'text-green-600' : 'text-red-600'}">${formatter.format(vals.netCashFlow)}</span></div><div class="flex justify-between text-gray-600"><span>Total Pengeluaran</span><span class="font-medium text-red-600">-${formatter.format(vals.expensesTotal)}</span></div><div class="flex justify-between font-semibold pt-2 border-t border-gray-50 mt-2 text-slate-800"><span>Pendapatan Cash</span><span id="rep-pendapatan-cash">${formatter.format(vals.cashIncome)}</span></div></div><div class="space-y-4"><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Pendapatan QRIS/Transfer</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedQris}" oninput="window.updateFormattedInput('qris', this)"></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Pendapatan Lain-Lain</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedLainLain}" oninput="window.updateFormattedInput('lainLain', this)"></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Setor Tunai (Diambil dari Kas)</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" value="${formattedSetorTunai}" oninput="window.updateFormattedInput('setorTunai', this)"></div></div><div class="flex justify-between font-semibold text-sm pt-2 border-t border-gray-50 mt-2 text-slate-800"><span>Total Pendapatan</span><span id="rep-total-pendapatan" class="text-emerald-700">${formatter.format(vals.totalIncome)}</span></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Total Pendapatan Qasir (App)</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span class="text-gray-500 font-bold">Rp</span></div><input type="text" inputmode="numeric" placeholder="0" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-right font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" value="${formattedQasir}" oninput="window.updateFormattedInput('qasir', this)"></div></div></div><div class="bg-slate-50 p-4 rounded-xl border border-gray-200"><div class="text-center"><div class="text-xs text-gray-500 font-semibold uppercase mb-1">Total Selisih</div><div id="rep-selisih-pendapatan" class="font-bold text-2xl ${discColor}">${formatter.format(vals.discrepancy)}</div><div id="rep-selisih-label" class="text-xs font-medium mt-1 ${discColor}">${discLabel}</div></div></div><div><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Keterangan Selisih</label><textarea rows="3" placeholder="Jelaskan penyebab selisih..." class="w-full p-3 bg-white border border-gray-200 rounded-lg text-sm text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none" oninput="window.updateNotesInput(this.value)">${escapeHtml(shiftData.notes)}</textarea></div><div class="border-t border-gray-50 pt-4 space-y-4">${gridAwal}${gridAkhir}</div><div class="pt-2 space-y-3" data-html2canvas-ignore="true"><button id="report-submit-btn" onclick="window.handleReportAndSave()" class="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold transition-colors"><span id="report-submit-spinner" class="hidden w-5 h-5 border-2 border-white/60 border-t-white rounded-full animate-spin"></span><svg id="report-submit-icon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg><span id="report-submit-label">Laporkan</span></button><div class="grid grid-cols-2 gap-3"><button onclick="window.captureScreenshot()" class="flex items-center justify-center space-x-2 bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 py-3 rounded-xl font-semibold transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Simpan</span></button><button onclick="window.copyReport()" class="flex items-center justify-center space-x-2 bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 py-3 rounded-xl font-semibold transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg><span>Salin</span></button></div></div></div>`;
             const saveButton = mainContent.querySelector('button[onclick="window.captureScreenshot()"]');
             saveButton.id = 'report-save-btn';
             saveButton.onclick = () => window.handleReportAndSave('download');
@@ -396,7 +412,7 @@
                 const row = document.createElement('div');
                 row.id = `row-${denom.value}`;
                 row.className = `flex items-center p-3 rounded-xl border-2 transition-all duration-200 bg-white shadow-sm ${borderClass}`;
-                row.innerHTML = `<div class="flex-shrink-0 w-20 h-12 flex items-center justify-center rounded-lg font-bold text-sm ${denom.bg} ${denom.color}">${formattedValue}</div><div class="flex-1 mx-4"><label class="text-xs text-gray-400 font-medium uppercase tracking-wider mb-0.5 block">Quantity</label><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" placeholder="0" class="w-full text-lg font-semibold text-slate-900 placeholder-gray-300 focus:outline-none" value="${qty}" onfocus="this.select()" oninput="window.updateCount(${denom.value}, this.value)"></div><div class="text-right min-w-[80px]"><span class="text-xs text-gray-400 font-medium block">Subtotal</span><span id="subtotal-${denom.value}" class="font-medium ${subtotal > 0 ? 'text-slate-900' : 'text-gray-300'}">${subtotal > 0 ? formatter.format(subtotal).replace('Rp', '').trim() : '-'}</span></div>`;
+                row.innerHTML = `<div class="flex-shrink-0 w-20 h-12 flex items-center justify-center rounded-lg font-bold text-sm ${denom.bg} ${denom.color}">${formattedValue}</div><div class="flex-1 mx-4"><label class="text-xs text-gray-400 font-medium uppercase tracking-wider mb-0.5 block">Quantity</label><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" placeholder="0" class="w-full text-lg font-semibold text-slate-900 placeholder-gray-300 focus:outline-none" value="${escapeHtml(qty)}" onfocus="this.select()" oninput="window.updateCount(${denom.value}, this.value)"></div><div class="text-right min-w-[80px]"><span class="text-xs text-gray-400 font-medium block">Subtotal</span><span id="subtotal-${denom.value}" class="font-medium ${subtotal > 0 ? 'text-slate-900' : 'text-gray-300'}">${subtotal > 0 ? formatter.format(subtotal).replace('Rp', '').trim() : '-'}</span></div>`;
                 mainContent.appendChild(row);
             });
             footerContainer.style.display = 'block';
@@ -416,7 +432,8 @@
                     const detailText = qty ? `Qty: ${qty} ${unit}` : 'Pengeluaran';
                     const itemEl = document.createElement('div');
                     itemEl.className = "flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-gray-100 fade-in";
-                    itemEl.innerHTML = `<div><div class="font-medium text-slate-800">${item.name}</div><div class="text-xs text-gray-400">${detailText}</div></div><div class="flex items-center space-x-3"><span class="font-semibold text-red-600">-${formatter.format(item.amount).replace('Rp', '').trim()}</span><button onclick="window.deleteExpense(${item.id})" class="p-2 -mr-2 text-gray-400 hover:text-red-500 transition-colors" aria-label="Hapus"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div>`;
+                    itemEl.innerHTML = `<div><div class="font-medium text-slate-800">${escapeHtml(item.name)}</div><div class="text-xs text-gray-400">${escapeHtml(detailText)}</div></div><div class="flex items-center space-x-3"><span class="font-semibold text-red-600">-${formatter.format(item.amount).replace('Rp', '').trim()}</span><button data-delete-expense="true" class="p-2 -mr-2 text-gray-400 hover:text-red-500 transition-colors" aria-label="Hapus"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div>`;
+                    itemEl.querySelector('[data-delete-expense]').addEventListener('click', () => deleteExpense(item.id));
                     listContainer.appendChild(itemEl);
                 });
             }
@@ -481,7 +498,7 @@
             const tsHour = String(ts.getHours()).padStart(2, '0');
             const tsMin = String(ts.getMinutes()).padStart(2, '0');
             const tsSec = String(ts.getSeconds()).padStart(2, '0');
-            return `Laporan_Harian_SKMK_${reportDateStr} from ${tsYear}-${tsMonth}-${tsDay} ${tsHour}${tsMin}${tsSec}.png`;
+            return `Laporan_Harian_${reportDateStr} from ${tsYear}-${tsMonth}-${tsDay} ${tsHour}${tsMin}${tsSec}.png`;
         }
 
         function getReportText() {
@@ -500,8 +517,7 @@
             else if (vals.discrepancy > 0) statusStr = 'SURPLUS (LEBIH)';
             else statusStr = 'DEFISIT (KURANG)';
             
-            // UPDATED: Added new fields to text report
-            return `*Laporan Rekonsiliasi SKMK*\nTanggal: ${dateStr}\n\nKas Awal: ${formatter.format(vals.startTotal)}\nKas Akhir: ${formatter.format(vals.endTotal)}\nSelisih Kas: ${formatter.format(vals.netCashFlow)}\nTotal Pengeluaran: ${formatter.format(vals.expensesTotal)}\nSetor Tunai: ${formatter.format(vals.setorTunai)}\n\nPendapatan Cash: ${formatter.format(vals.cashIncome)}\nPendapatan QRIS: ${formatter.format(vals.qris)}\nPendapatan Lain-Lain: ${formatter.format(vals.lainLain)}\n\n*Total Pendapatan: ${formatter.format(vals.totalIncome)}*\n*Total App Qasir: ${formatter.format(vals.qasir)}*\n------------------\n*SELISIH AKHIR: ${formatter.format(vals.discrepancy)}*\n(${statusStr})\n\nKeterangan:\n${shiftData.notes || '-'}${expenseDetails}`;
+            return `*Laporan Rekonsiliasi*\nTanggal: ${dateStr}\n\nKas Awal: ${formatter.format(vals.startTotal)}\nKas Akhir: ${formatter.format(vals.endTotal)}\nSelisih Kas: ${formatter.format(vals.netCashFlow)}\nTotal Pengeluaran: ${formatter.format(vals.expensesTotal)}\nSetor Tunai: ${formatter.format(vals.setorTunai)}\n\nPendapatan Cash: ${formatter.format(vals.cashIncome)}\nPendapatan QRIS: ${formatter.format(vals.qris)}\nPendapatan Lain-Lain: ${formatter.format(vals.lainLain)}\n\n*Total Pendapatan: ${formatter.format(vals.totalIncome)}*\n*Total App Qasir: ${formatter.format(vals.qasir)}*\n------------------\n*SELISIH AKHIR: ${formatter.format(vals.discrepancy)}*\n(${statusStr})\n\nKeterangan:\n${shiftData.notes || '-'}${expenseDetails}`;
         }
 
         function getDiscrepancyStatus(vals) {
@@ -512,7 +528,9 @@
 
         function createRequestId() {
             if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-            return `skmk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
         }
 
         function getDenominationSnapshot(data) {
@@ -550,8 +568,7 @@
                 notes: shiftData.notes || '',
                 image: {
                     filename: filename,
-                    base64: base64,
-                    folderId: GOOGLE_DRIVE_FOLDER_ID
+                    base64: base64
                 }
             };
         }
@@ -605,7 +622,50 @@
                 });
         }
 
-        function submitReportToAppsScript(payload) {
+        function getSubmissionToken() {
+            if (submissionToken) return Promise.resolve(submissionToken);
+            const dialog = document.getElementById('access-dialog');
+            const input = document.getElementById('access-code');
+            input.value = '';
+            dialog.returnValue = '';
+            return new Promise((resolve, reject) => {
+                dialog.addEventListener('close', () => {
+                    const value = input.value;
+                    input.value = '';
+                    if (dialog.returnValue !== 'submit' || !value) {
+                        reject(new Error('Penyimpanan dibatalkan. Laporan tetap tersedia di perangkat.'));
+                        return;
+                    }
+                    submissionToken = value;
+                    resolve(value);
+                }, { once: true });
+                dialog.showModal();
+                input.focus();
+            });
+        }
+
+        function isAppsScriptResponse(event, iframe) {
+            // Apps Script replies from a sandboxed child of the submission iframe.
+            if (!/^https:\/\/(script\.google\.com|script\.googleusercontent\.com|[a-z0-9-]+-script\.googleusercontent\.com)$/.test(event.origin)) return false;
+            try {
+                let source = event.source;
+                for (let depth = 0; source && depth < 5; depth++) {
+                    if (source === iframe.contentWindow) return true;
+                    if (source === source.parent) break;
+                    source = source.parent;
+                }
+            } catch (error) { return false; }
+            return false;
+        }
+
+        async function submitReportToAppsScript(payload) {
+            if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(GOOGLE_SCRIPT_URL)) {
+                throw new Error('Penyimpanan cloud belum dikonfigurasi. Hubungi pengelola atau lanjutkan tanpa menyimpan.');
+            }
+            if (window.location.origin === 'null') {
+                throw new Error('Gunakan alamat HTTP lokal atau HTTPS untuk menyimpan ke cloud.');
+            }
+            const authToken = await getSubmissionToken();
             return new Promise((resolve, reject) => {
                 const iframeName = `apps-script-submit-${payload.requestId}`;
                 const iframe = document.createElement('iframe');
@@ -615,17 +675,20 @@
 
                 function cleanup() {
                     clearTimeout(timeoutId);
+                    input.value = '';
                     window.removeEventListener('message', onMessage);
                     if (document.body.contains(form)) document.body.removeChild(form);
                     if (document.body.contains(iframe)) document.body.removeChild(iframe);
                 }
 
                 function onMessage(event) {
+                    if (!isAppsScriptResponse(event, iframe)) return;
                     let data = event.data;
                     if (typeof data === 'string') {
                         try { data = JSON.parse(data); } catch (e) { return; }
                     }
                     if (!data || data.source !== 'laporkasir-apps-script' || data.requestId !== payload.requestId) return;
+                    if (data.response && data.response.code === 'UNAUTHORIZED') submissionToken = '';
                     cleanup();
                     resolve(data.response || data);
                 }
@@ -639,7 +702,7 @@
                 form.className = 'hidden';
                 input.type = 'hidden';
                 input.name = 'payload';
-                input.value = JSON.stringify(payload);
+                input.value = JSON.stringify({ ...payload, authToken, clientOrigin: window.location.origin });
                 form.appendChild(input);
 
                 timeoutId = setTimeout(() => {
@@ -656,8 +719,8 @@
 
         function shareReportContext(context, fromUserGesture) {
             if (navigator.clipboard) navigator.clipboard.writeText(context.reportText).catch(() => {});
-            const shareData = context.file ? { files: [context.file], text: context.reportText, title: 'Laporan SKMK' } : null;
-            const textOnlyShareData = { text: context.reportText, title: 'Laporan SKMK' };
+            const shareData = context.file ? { files: [context.file], text: context.reportText, title: 'Laporan Kasir' } : null;
+            const textOnlyShareData = { text: context.reportText, title: 'Laporan Kasir' };
 
             if (shareData && navigator.canShare && navigator.canShare(shareData)) {
                 navigator.share(shareData)
@@ -687,7 +750,7 @@
 
         function downloadReportContext(context) {
             if (!context.file) {
-                showToast('Data tersimpan, tetapi gambar gagal dibuat.');
+                showToast(context.savedToCloud ? 'Data tersimpan, tetapi gambar gagal dibuat.' : 'Gambar gagal dibuat. Teks laporan tetap tersedia.');
                 return;
             }
             const link = document.createElement('a');
@@ -696,7 +759,7 @@
             link.href = objectUrl;
             link.click();
             setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-            showToast('Data dan gambar berhasil disimpan!');
+            showToast(context.savedToCloud ? 'Data dan gambar berhasil disimpan!' : 'Gambar berhasil disimpan di perangkat.');
         }
 
         function runReportAction(context, action, fromUserGesture) {
@@ -751,7 +814,6 @@
             
             clone.appendChild(timestampDiv);
 
-            // --- REVISION: Compact Income List Spacing for Screenshot ---
             // Find the container holding the income inputs and tighten the spacing
             const labels = Array.from(clone.querySelectorAll('label'));
             const qrisLabel = labels.find(l => l.textContent.includes('Pendapatan QRIS'));
@@ -759,13 +821,10 @@
                 const incomeContainer = qrisLabel.closest('.space-y-4');
                 if (incomeContainer) {
                     incomeContainer.classList.remove('space-y-4');
-                    // UPDATED: Changed from space-y-1 to space-y-2
                     incomeContainer.classList.add('space-y-2'); 
                 }
             }
-            // -------------------------------------------------------------
 
-            // --- REVISION: Fix Denomination Grid Spacing for Screenshot ---
             // html2canvas renders text slightly larger/differently, causing clipping in tight boxes.
             // We increase the container heights in the CLONE only, leaving the web UI compact.
             const gridCells = clone.querySelectorAll('.grid > .flex-col');
@@ -775,7 +834,6 @@
                 if (labelDiv) {
                     labelDiv.classList.remove('h-7'); // Remove tight height
                     // Use padding to let content breathe and prevent clipping
-                    // UPDATED: Reverted to py-2 (was py-1), adjusted min-height accordingly
                     labelDiv.classList.add('py-2', 'h-auto', 'min-h-[30px]'); 
                     // Ensure flex centering handles the new height
                     labelDiv.classList.add('flex', 'items-center', 'justify-center'); 
@@ -786,13 +844,11 @@
                 if (amountDiv) {
                     amountDiv.classList.remove('h-10'); // Remove tight height
                     // Use padding to let content breathe and prevent clipping
-                    // KEEP: py-2 for amount
                     amountDiv.classList.add('py-2', 'h-auto', 'min-h-[32px]');    
                     // Ensure flex centering handles the new height
                     amountDiv.classList.add('flex', 'items-center', 'justify-center');
                 }
             });
-            // -------------------------------------------------------------
 
             const dateContainer = clone.querySelector('.mb-4.text-center');
             if (dateContainer) {
@@ -829,7 +885,7 @@
                 const noteText = shiftData.notes || '-';
                 const staticNote = document.createElement('div');
                 staticNote.className = "mt-4 space-y-1";
-                staticNote.innerHTML = `<div class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Keterangan Selisih</div><div class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${noteText}</div>`;
+                staticNote.innerHTML = `<div class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Keterangan Selisih</div><div class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(noteText)}</div>`;
                 container.replaceWith(staticNote);
             }
             
@@ -857,11 +913,13 @@
                     if (!response || response.ok === false) throw new Error((response && response.message) || 'Laporan gagal disimpan.');
 
                     if (response.status === 'duplicate') {
+                        context.savedToCloud = true;
                         openDuplicateModal(context, response, action);
                         return;
                     }
 
                     if (response.status === 'saved') {
+                        context.savedToCloud = true;
                         if (action === 'download') showToast('Laporan tersimpan. Menyimpan gambar...');
                         else showToast('Laporan tersimpan. Membuka WhatsApp...');
                         runReportAction(context, action, false);
