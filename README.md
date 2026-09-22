@@ -19,8 +19,8 @@ Qasir adalah nilai pembanding yang dimasukkan manual; tidak ada integrasi API Qa
 Gunakan Node.js 20+ untuk server lokal dan pengujian. Tidak perlu memasang dependensi npm.
 
 ```sh
-git clone https://github.com/thecatlab/LaporKasir.git
-cd LaporKasir
+git clone https://github.com/thecatlab/lapor-kasir-umkm.git
+cd lapor-kasir-umkm
 node scripts/serve.mjs
 ```
 
