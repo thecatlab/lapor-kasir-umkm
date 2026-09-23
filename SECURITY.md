@@ -19,17 +19,17 @@ Reviewed on 2026-09-22. Scope: all four originally tracked files and 28 historic
 
 No API keys, private keys, passwords, transaction exports, customer records, or personnel records were found in the reviewed tracked files/history. Business names and service identifiers were present. No inappropriate personal content was identified; presentation issues were the minimal README, organization-specific branding, and stale revision comments. The legacy browser storage key remains to preserve drafts.
 
-## Deployment actions still required
+## Deployment follow-up (2026-09-23)
 
-Local changes do not secure an already deployed Apps Script version.
+The updated backend was deployed as version 5 at the existing web-app URL. The original spreadsheet and Drive folder IDs remain configured in Script Properties, together with the allowed frontend origin and an owner-saved access token. No token was committed or included in frontend configuration.
 
-1. Configure the existing spreadsheet ID, intended Drive folder, allowed frontend origins, and a new random token in Script Properties; see [README.md](README.md).
-2. Deploy the updated backend and frontend together. Supply `config.js` through deployment; never put the token there.
-3. Disable old unauthenticated deployments. Prior identifiers remain in history, forks, and caches. History was not rewritten.
-4. Review Sheets/Drive sharing and existing data for unexpected entries/formulas. This review does not establish whether an endpoint was abused. Existing spreadsheet formulas were not modified.
-5. Validate Google login redirects and the iframe response flow in a test deployment before production use.
+GitHub Pages now deploys through Actions. Its build supplies public `config.js` from the repository variable and publishes only the intended browser assets; backend source is excluded. The original Apps Script endpoint is unchanged.
 
-The original endpoint was preserved locally in ignored `config.js` for migration reference; update it if creating a new deployment. Publish only browser assets, not the working directory or `.git`. A fresh clone needs its own configuration.
+The live site's authenticated, read-only storage check returned **Koneksi Siap**, confirming the real iframe response flow and access to the configured spreadsheet's required tabs and the existing Drive folder. This check does not create reports or verify write operations. Production report writes were deliberately not tested with synthetic data.
+
+The deployment manager showed one active deployment (updated in place) and three archived deployments. Review any other projects or deployments separately. Prior identifiers remain in history, forks, and caches; history was not rewritten. Sheets/Drive sharing and historical data still need an owner review for unexpected entries/formulas. This review does not establish whether the old endpoint was abused; existing data and formulas were not modified.
+
+A fresh clone still needs its own configuration; see [README.md](README.md). Never publish the working directory, `.git`, or an access token.
 
 ## Remaining limitations
 
@@ -43,16 +43,16 @@ The original endpoint was preserved locally in ignored `config.js` for migration
 
 ## Verification
 
-Run `node --test tests/security.test.cjs`. Tests cover authentication before side effects, exact origin checks, input/size limits, literal spreadsheet text, server-owned upload destinations, error redaction, response framing, duplicates/revisions, original calculations, and browser escaping.
+Run `node --test tests/*.test.cjs`. Tests cover authentication before side effects, exact origin checks, input/size limits, literal spreadsheet text, server-owned upload destinations, error redaction, response framing, duplicates/revisions, original calculations, browser escaping, the read-only connection check, and the Pages artifact/configuration.
 
 Verification completed during this review:
 
-- All 14 Node tests passed, including the authenticated save → duplicate screenshot recovery → revised report flow with mock Sheets/Drive services.
+- All 18 Node tests passed, including the authenticated save → duplicate screenshot recovery → revised report flow with mock Sheets/Drive services.
 - Desktop and 390px mobile browser checks passed for all four tabs, reconciliation totals, persisted drafts after refresh, literal malicious expense/notes text, and PNG creation (750px desktop and 500px mobile exports).
 - Browser checks passed for the access-code dialog, memory-only token handling, mocked authenticated submission, forged-origin rejection, response cleanup, and local PNG fallback after a simulated cloud failure.
 - The local server returned 404 for Git metadata, environment files, backend source, and report paths. Patch whitespace checks passed.
 
-All reports used synthetic data on localhost. No test report was sent to production. Live Google permissions, deployments, and real iframe redirects still require validation in an owner-controlled test environment.
+All test reports used synthetic data with local mocks. No test report was sent to production. The live authenticated connection and real iframe redirects were verified separately on 2026-09-23 without writes. A complete live report upload/write cycle remains unverified; use a dedicated test deployment or observe an authorized real report rather than inserting synthetic production records.
 
 For suspected vulnerabilities, contact the owner privately through an available verified channel. Do not post access codes, production URLs, report data, or exploit details in public issues.
 
