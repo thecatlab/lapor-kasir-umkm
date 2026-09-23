@@ -25,7 +25,9 @@ The updated backend was deployed as version 5 at the existing web-app URL. The o
 
 GitHub Pages now deploys through Actions. Its build supplies public `config.js` from the repository variable and publishes only the intended browser assets; backend source is excluded. The original Apps Script endpoint is unchanged.
 
-The live site's authenticated, read-only storage check returned **Koneksi Siap**, confirming the real iframe response flow and access to the configured spreadsheet's required tabs and the existing Drive folder. This check does not create reports or verify write operations. Production report writes were deliberately not tested with synthetic data.
+The live site's authenticated, read-only storage check returned **Koneksi Siap**, confirming the real iframe response flow and access to the configured spreadsheet's required tabs and the existing Drive folder. After the owner explicitly requested a production test, a clearly labeled synthetic report using a separate future date was saved through the live frontend. Its report row, linked expense, totals, and viewable PNG in the original folder were verified. A second submission returned the duplicate response and reused the same submission and image instead of adding records.
+
+With the owner's cleanup approval, the exact test report/expense cells were cleared, the PNG was moved to the owner's Drive bin, and the synthetic browser draft was reset. Readback confirmed the pre-existing sheet values and cell formatting were unchanged. The test image is recoverable from the bin while retained by Drive.
 
 The deployment manager showed one active deployment (updated in place) and three archived deployments. Review any other projects or deployments separately. Prior identifiers remain in history, forks, and caches; history was not rewritten. Sheets/Drive sharing and historical data still need an owner review for unexpected entries/formulas. This review does not establish whether the old endpoint was abused; existing data and formulas were not modified.
 
@@ -40,6 +42,7 @@ A fresh clone still needs its own configuration; see [README.md](README.md). Nev
 - Authorized users can submit incorrect business figures. Calculations were kept compatible; this is not an accounting audit or server-side reconciliation engine.
 - Sheets writes and Drive uploads are not transactional. Failures may leave partial writes or orphaned images, as in the existing integration.
 - Exported reports, clipboard contents, and shared messages expose business information to their recipients. Keep operational exports outside the public repository.
+- Live verification found **Anyone with the link** access on the production spreadsheet and the newly uploaded PNG. The app's access code protects its submission endpoint, not direct Sheets/Drive links. Sharing permissions were not changed during testing; the owner should review whether link access is intentional before treating these records as private.
 
 ## Verification
 
@@ -52,7 +55,7 @@ Verification completed during this review:
 - Browser checks passed for the access-code dialog, memory-only token handling, mocked authenticated submission, forged-origin rejection, response cleanup, and local PNG fallback after a simulated cloud failure.
 - The local server returned 404 for Git metadata, environment files, backend source, and report paths. Patch whitespace checks passed.
 
-All test reports used synthetic data with local mocks. No test report was sent to production. The live authenticated connection and real iframe redirects were verified separately on 2026-09-23 without writes. A complete live report upload/write cycle remains unverified; use a dedicated test deployment or observe an authorized real report rather than inserting synthetic production records.
+The automated/browser security tests used synthetic data with local mocks. On 2026-09-23, the owner separately authorized a bounded production save and duplicate test, followed by cleanup as described above. This verified authentication, the real iframe response, report and expense writes, correct saved totals, PNG upload to the original folder, and duplicate handling. It does not establish that every failure mode, revision path, browser, mobile share target, or historical record is correct. Future synthetic tests should use mocks or a dedicated test deployment unless the owner explicitly authorizes another production test.
 
 For suspected vulnerabilities, contact the owner privately through an available verified channel. Do not post access codes, production URLs, report data, or exploit details in public issues.
 
